@@ -1,0 +1,29 @@
+# Dataset
+Dataset/
+
+# Trained models / checkpoints
+models/*.pth
+*.pt
+*.pth
+
+# Generated results
+results/*.csv
+results/*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
