@@ -79,8 +79,6 @@ Training loss shows fast convergence of the CTC objective, and the character-lev
 
 ```
 captcha-recognition-crnn/
-├── comparison/
-│   └── deepcaptcha.py
 ├── Dataset/                 # local dataset, not committed
 │   └── generated_captcha_images/
 ├── docs/
@@ -100,10 +98,6 @@ captcha-recognition-crnn/
 ├── README.md
 └── requirements.txt
 ```
-
-## Comparison experiment
-
-`comparison/deepcaptcha.py` is a separate experimental baseline using fixed-position character classification instead of sequence decoding. It's kept for reference but isn't part of the main CRNN pipeline.
 
 ## Installation
 
