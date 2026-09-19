@@ -1,89 +1,145 @@
 # CAPTCHA Recognition using CRNN
 
-A deep learning CAPTCHA recognition system that reads the full character sequence from a CAPTCHA image end-to-end, using a Convolutional Recurrent Neural Network (CRNN).
+A deep learning CAPTCHA recognition system that reads the full character sequence from a CAPTCHA image end-to-end using a Convolutional Recurrent Neural Network (CRNN).
 
-It combines a ResNet-18 backbone for visual feature extraction, bidirectional GRUs for sequence modeling, and Connectionist Temporal Classification (CTC) for decoding — so there's no need to segment individual characters before recognizing them.
+It combines a ResNet-18 visual backbone, bidirectional GRUs for sequence modeling, and Connectionist Temporal Classification (CTC) for alignment-free sequence recognition.
 
 ## Overview
 
-Rather than classifying each character independently, this treats CAPTCHA reading as a sequence recognition problem: the model looks at the whole image and predicts the character sequence directly.
+Rather than classifying each character independently, the model treats CAPTCHA recognition as a sequence prediction problem:
 
-Pipeline: CAPTCHA image → ResNet-18 feature extraction → sequence formation → two BiGRU layers → CTC decoding → predicted text.
+**CAPTCHA image → ResNet-18 feature extraction → sequence formation → BiGRU → BiGRU → CTC decoding → predicted text**
 
-## Model architecture
+The approach avoids manual character segmentation.
 
-**Visual feature extraction** — a pretrained ResNet-18 backbone extracts spatial features from the image, which are reshaped into a sequence so each spatial position becomes a timestep.
+## Model Architecture
 
-**Sequence modeling** — the feature sequence passes through two bidirectional GRU layers, letting the model use context from both directions of the character sequence.
+### Visual feature extraction
 
-**CTC decoding** — a linear classifier on top of the GRU output is trained with CTC loss, which learns the alignment between image features and target characters without needing manually segmented characters. At inference, CTC decoding collapses repeated predictions and strips blank tokens to produce the final string.
+A pretrained ResNet-18 backbone extracts spatial image features. The resulting feature map is reshaped across the width dimension so each spatial position becomes a timestep in the sequence.
+
+A convolutional refinement layer is applied before sequence modeling.
+
+### Sequence modeling
+
+The feature sequence is passed through two bidirectional GRU layers. The first BiGRU produces forward and backward representations that are merged before the second BiGRU.
+
+### CTC decoding
+
+A linear classifier produces character logits at each timestep. CTC loss learns the alignment between the image feature sequence and the target CAPTCHA text without requiring character-level bounding boxes.
+
+At inference, repeated predictions are collapsed and the CTC blank token is removed to form the predicted string.
 
 ## Dataset
 
-9,955 CAPTCHA images, 4 characters each, split 7,964 train / 1,991 test (80/20).
+The project uses **9,955 CAPTCHA images**, each containing **4 characters**:
+
+- Training: 7,964 images
+- Held-out test: 1,991 images
+- Split: 80/20
+- Random state: 0
 
 Character vocabulary:
 
-```
+```text
 2 3 4 5 6 7 8 9
 A B C D E F G H
 J K L M N P Q R
 S T U V W X Y Z
 ```
 
-Not included in this repo — place it locally at:
+The dataset is intentionally not committed to the repository.
 
-```
+Expected local path:
+
+```text
 Dataset/
 └── generated_captcha_images/
 ```
 
-## Training
+Each PNG filename is interpreted as its target text.
 
-- Architecture: ResNet-18 + BiGRU + BiGRU + CTC
-- Input size: 64×200
-- Batch size: 16, 30 epochs
-- 80/20 train/test split, CTC loss
+## Training Configuration
+
+| Setting | Value |
+|---|---|
+| Input size | 64 × 200 |
+| Batch size | 16 |
+| Epochs | 30 |
+| RNN hidden size | 256 |
+| Optimizer | Adam |
+| Learning rate | 0.001 |
+| Weight decay | 0.001 |
+| Gradient clipping | 5 |
+| Loss | CTC |
+| Train/test split | 80/20 |
+| Random state | 0 |
+
+Run training with:
 
 ```bash
 python -m src.train
 ```
 
-Trained weights are saved to `models/`.
+The trained checkpoint is written locally to:
+
+```text
+models/crnn_captcha.pth
+```
+
+Model checkpoints are ignored by Git and are not part of the repository.
 
 ## Results
 
-Evaluated on the 1,991-image held-out test set (7,952 characters total):
+The reported results below come from the held-out **1,991-image test split**.
 
 | Metric | Score |
-|---|---|
-| Exact string accuracy | 99.30% |
-| Character accuracy | 99.86% |
-| Character precision | 99.85% |
-| Character recall | 99.86% |
-| Character F1 | 99.86% |
+|---|---:|
+| Exact string accuracy | **99.30%** |
+| Character accuracy | **99.86%** |
+| Character precision | **99.85%** |
+| Character recall | **99.86%** |
+| Character F1 | **99.86%** |
 
-The model gets the complete 4-character string exactly right 99.3% of the time.
+The exact-string metric is the primary end-to-end measure: it requires the entire 4-character CAPTCHA to be predicted correctly.
+
+### Metric note
+
+The character-level metrics in the current evaluation script are computed only for examples where the decoded prediction has the same length as the target. This is useful for analyzing character substitutions, but it does not fully penalize missing or extra decoded characters.
+
+Therefore, the **99.30% exact-string accuracy** is the most direct measure of complete CAPTCHA recognition performance for this experiment.
 
 ## Evaluation
+
+After training:
 
 ```bash
 python -m src.evaluate
 ```
 
-Produces exact-string and character-level accuracy, precision/recall/F1, a classification report, confusion matrix, and sample predictions, saved to `results/`.
+The evaluation script reports:
 
-Training loss shows fast convergence of the CTC objective, and the character-level confusion matrix is heavily diagonal — errors are rare and not concentrated on any particular character pair.
+- exact-string accuracy
+- character-level accuracy
+- character-level precision, recall, and F1
+- a classification report
+- sample predictions saved to `results/predictions.csv`
+- metrics saved to `results/metrics.txt`
+- character confusion matrix saved to `results/confusion_matrix.png`
 
-## Project structure
+Training loss curves are saved to:
 
+```text
+results/loss_curves.png
 ```
+
+## Project Structure
+
+```text
 captcha-recognition-crnn/
-├── Dataset/                 # local dataset, not committed
+├── Dataset/                         # local dataset, not committed
 │   └── generated_captcha_images/
-├── docs/
-│   └── architecture.png
-├── models/                  
+├── models/                          # local checkpoints, ignored by Git
 ├── results/
 │   ├── loss_curves.png
 │   ├── confusion_matrix.png
@@ -94,7 +150,13 @@ captcha-recognition-crnn/
 │   ├── model.py
 │   ├── train.py
 │   └── evaluate.py
+├── tests/
+│   └── test_project_contracts.py
+├── .github/
+│   └── workflows/
+│       └── tests.yml
 ├── .gitignore
+├── LICENSE
 ├── README.md
 └── requirements.txt
 ```
@@ -106,12 +168,35 @@ git clone https://github.com/ritanshu-kumar/captcha-recognition-crnn.git
 cd captcha-recognition-crnn
 
 python -m venv .venv
-.venv\Scripts\activate
+```
 
+Activate the environment.
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+### Linux / macOS
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-Place the dataset at `Dataset/generated_captcha_images/`, then:
+Place the dataset at:
+
+```text
+Dataset/generated_captcha_images/
+```
+
+Then run:
 
 ```bash
 python -m src.train
@@ -120,12 +205,22 @@ python -m src.evaluate
 
 ## Reproducibility
 
-The train/test split uses a fixed random seed, so the partition is consistent across runs. The results above are from the CRNN model evaluated on that held-out split.
+The dataset split uses `random_state=0`, making the train/test partition deterministic for the same input dataset.
 
-## Possible extensions
+The repository does not include the dataset or trained checkpoint, so reproducing the reported metrics requires the same dataset and a compatible PyTorch/torchvision environment.
 
-Augmentation for harder CAPTCHA variations, beam-search CTC decoding, testing against noise/rotation/occlusion, a transformer-based sequence model for comparison, and wrapping the model in an inference API.
+## Limitations and Extensions
+
+The current experiment is evaluated on one generated CAPTCHA distribution. Generalization to substantially different CAPTCHA styles, fonts, noise patterns, rotations, occlusions, or adversarial transformations has not been established by the reported test results.
+
+Potential extensions include:
+
+- stronger image augmentation
+- beam-search CTC decoding
+- robustness evaluation under noise, rotation, and occlusion
+- comparison against transformer-based sequence models
+- a lightweight inference API
 
 ## License
 
-For educational and research use.
+This project is licensed under the MIT License.

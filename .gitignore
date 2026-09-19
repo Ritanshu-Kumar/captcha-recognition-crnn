@@ -2,11 +2,12 @@
 Dataset/
 
 # Trained models / checkpoints
-models/*.pth
+models/
 *.pt
 *.pth
+*.ckpt
 
-# Generated results
+# Generated evaluation artifacts
 results/*.csv
 results/*.txt
 
@@ -14,6 +15,9 @@ results/*.txt
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environments
 .venv/
@@ -28,4 +32,5 @@ env/
 .DS_Store
 Thumbs.db
 
+# Local scratch / comparison files
 comparison/
